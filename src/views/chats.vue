@@ -1,4 +1,18 @@
 ﻿<template>
+
+  <Dialog v-model:visible="showOutputDialog" header="References" modal style="width: 70vw;">
+    <TabView>
+      <TabPanel
+        v-for="tab in outputObject"
+        :key="tab.value"
+        :header="tab.title"
+      >
+        <vue-json-pretty :data="tab.content" />
+      </TabPanel>
+    </TabView>
+  </Dialog>
+
+  
   <div class="chat-shell">
     <!-- Header -->
     <header class="chat-header">
@@ -28,7 +42,10 @@
         <div class="bubble">
           <div class="content" v-if="m.role!=='typing'">
             <!-- keep it simple & safe: plain text with line breaks -->
-            <pre class="plaintext">{{ m.content }}</pre>
+            <div class="content markdown" v-html="renderMarkdown(m.content)"></div>
+            <button class="btnReferences" v-if="(m.role==='assistant') && (m.outputs.length > 0)" @click="viewOutputs(m.outputs)"> 
+              <i class="pi pi-link" /> {{ m.outputs.length }}
+            </Button>
           </div>
 
           <!-- typing indicator -->
@@ -63,10 +80,18 @@
 </template>
 
 <script setup>
+import api from '@/boot/axios';
+import { marked } from "marked";
 import { ref, nextTick, onMounted } from "vue";
+import Dialog from 'primevue/dialog';
+import VueJsonPretty from "vue-json-pretty";
+import "vue-json-pretty/lib/styles.css";
+import TabView from "primevue/tabview";
+import TabPanel from "primevue/tabpanel";
+
 
 const messages = ref([
-  { id: cryptoRandomId(), role: "assistant", content: "Hi! How can I help you today?", timestamp: Date.now() }
+  { id: cryptoRandomId(), role: "assistant", content: "Hi! How can I help you today?", outputs: [], timestamp: Date.now() }
 ]);
 
 const draft = ref("");
@@ -74,13 +99,16 @@ const sending = ref(false);
 const scrollEl = ref(null);
 const inputEl = ref(null);
 
+// references dialog
+const showOutputDialog = ref(false);
+const outputObject = ref([])
+
 onMounted(() => {
   autoResize();
   scrollToBottom();
 });
 
 function cryptoRandomId() {
-  // simple unique id
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
@@ -100,7 +128,11 @@ function autoResize() {
   el.style.height = Math.min(el.scrollHeight, 180) + "px";
 }
 
-async function send() {
+function renderMarkdown(md) {
+  return marked(md ?? "");
+}
+
+const send = async () => {
   const text = draft.value.trim();
   if (!text || sending.value) return;
 
@@ -109,6 +141,7 @@ async function send() {
     id: cryptoRandomId(),
     role: "user",
     content: text,
+    outputs: [],
     timestamp: Date.now()
   });
   draft.value = "";
@@ -122,27 +155,31 @@ async function send() {
     id: typingId,
     role: "typing",
     content: "",
+    outputs: [],
     timestamp: Date.now()
   });
   sending.value = true;
 
   try {
-    // --- OPTION A: call your backend (non-streaming example) ---
-    // const replyText = await callBackend(text, messages.value);
 
-    // --- OPTION B: local mock (delete when wired to backend) ---
-    const replyText = await mockAssistant(text);
+    let payload = {  question: text }
+    api.post('/chat/ask', payload) 
+    .then((response) => {
+      if(response.status == 200) { 
+        const idx = messages.value.findIndex(m => m.id === typingId);
+        messages.value.splice(idx, 1, {
+          id: cryptoRandomId(),
+          role: "assistant",
+          content: response.data.response,
+          outputs: response.data.outputs,
+          timestamp: Date.now()
+        });
+      }
+    })
+    .catch((error) => {		
+      console.log(error)
+    })
 
-    // replace typing bubble with real assistant message
-    const idx = messages.value.findIndex(m => m.id === typingId);
-    if (idx !== -1) {
-      messages.value.splice(idx, 1, {
-        id: cryptoRandomId(),
-        role: "assistant",
-        content: replyText,
-        timestamp: Date.now()
-      });
-    }
   } catch (e) {
     // show error
     const idx = messages.value.findIndex(m => m.id === typingId);
@@ -151,6 +188,7 @@ async function send() {
         id: cryptoRandomId(),
         role: "assistant",
         content: "⚠️ Sorry, something went wrong. Please try again.",
+        outputs: [],
         timestamp: Date.now()
       });
     }
@@ -168,39 +206,16 @@ function scrollToBottom() {
   el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 }
 
-/* ---------- Backend hook (replace with your API) ---------- */
-async function callBackend(userText, history) {
-  // Example POST to your server
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: userText,
-      history: history
-        .filter(m => m.role !== "typing")
-        .map(({ role, content }) => ({ role, content }))
-    })
-  });
-  if (!res.ok) throw new Error("API error");
-  const data = await res.json();
-  return data.reply; // { reply: "..." }
+
+const viewOutputs = (outputs) => {
+  showOutputDialog.value = true 
+  outputObject.value = outputs.map((obj, index) => ({
+    value: index.toString(),
+    title: `Segment ${obj.segment_id ?? index}`,
+    content: obj
+  }))
 }
 
-/* ---------- Mock assistant for demo ---------- */
-function mockAssistant(prompt) {
-  const canned = [
-    "Here's a quick summary:",
-    "Sure! Here are some ideas:",
-    "I can help with that. First, …",
-    "To solve this, consider:"
-  ];
-  const head = canned[Math.floor(Math.random() * canned.length)];
-  const body =
-    "\n\n• Point A\n• Point B\n• Point C\n\n" +
-    "If you want, I can refine or give code examples.";
-  // simulate latency
-  return new Promise(resolve => setTimeout(() => resolve(`${head} "${prompt}"${body}`), 900));
-}
 </script>
 
 
@@ -345,7 +360,22 @@ pre.plaintext {
   border-color: #c7c7f7;
   background: #fff;
 }
+
+.btnReferences{
+  width: 80px;
+  height: 20px;
+  padding: 0 14px;
+  border: 1px solid #071847;
+  background: #fff;
+  color: #071847;
+  border-radius: 8px;
+  float: right;
+  cursor: pointer;
+  bottom: 0;
+}
+
 .send {
+  height: 40px;
   padding: 0 14px;
   border: 1px solid #071847;
   background: #071847;

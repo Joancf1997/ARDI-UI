@@ -1,9 +1,10 @@
 import axios from 'axios'
-import { useLoadingStore } from '../stores/loading';
+// import { useLoadingStore } from '../stores/loading';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_BACKEND || "https://mtr.i4solutions.pro/api/",
+    baseURL: "http://127.0.0.1:8000",
     timeout: 10000,
+    timeout: 120000, 
     headers: { Accept: 'application/json' }
 });
 
@@ -13,29 +14,29 @@ export function installAxiosInterceptors() {
     if (installed) return;
     installed = true;
 
-    const loading = useLoadingStore();
+    // const loading = useLoadingStore();
 
     api.interceptors.request.use(
         (config) => {
-            loading.setLoading(true);
-            var userauth = JSON.parse(window.localStorage.getItem('I4MON'));
+            // loading.setLoading(true);
+            var userauth = JSON.parse(window.localStorage.getItem('ARDI'));
             var token = userauth ? userauth.usuario.token : null;
             config.headers.Authorization = token
             return config;
         },
         (error) => {
-            loading.setLoading(false);
+            // loading.setLoading(false);
             return Promise.reject(error);
         }
     );
 
     api.interceptors.response.use(
         (response) => {
-            loading.setLoading(false);
+            // loading.setLoading(false);
             return response;
         },
         (error) => {
-            loading.setLoading(false);
+            // loading.setLoading(false);
             return Promise.reject(error);
         }
     );

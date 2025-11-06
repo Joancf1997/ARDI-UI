@@ -170,8 +170,8 @@ const send = async () => {
         messages.value.splice(idx, 1, {
           id: cryptoRandomId(),
           role: "assistant",
-          content: response.data.response,
-          outputs: response.data.outputs,
+          content: response.data.response.response,
+          outputs: response.data.response.outputs,
           timestamp: Date.now()
         });
       }

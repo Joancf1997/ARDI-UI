@@ -25,35 +25,29 @@
 </template>
 
 <script setup>
+import api from '@/boot/axios';
 import { useRouter } from 'vue-router';
+import { ref, onMounted } from "vue";
 import UserSegmentCard from "@/components/UserSegmentCard.vue";
 
 const router = useRouter();
-const userSegments = [
-	{
-		id: 1,
-		title: "Schulwesen und Unwetter-Themen dominieren Interesse",
-		unique_users: 160187,
-		trend: [0, 0.1, 0.2, 0.3, 0.55, 0.1, 0.05],
-	},
-	{
-		id: 2,
-		title: "Westernstadt- und Pullman-City-Themen dominieren Interesse",
-		unique_users: 111918,
-		trend: [0, 0.05, 0.05, 0.1, 0.65, 0.2],
-	},
-	{
-		id: 3,
-		title: "Bahntreue und Tarifstreit",
-		unique_users: 113372,
-		trend: [0.05, 0.07, 0.1, 0.15, 0.42],
-	},
-	// ... add rest of your segments here ...
-];
+const userSegments = ref([]);
+
+const loadSegment = async () => { 
+	api.get('/UserSegments') 
+	.then((response) => {
+		if(response.status == 200) { 
+			userSegments.value = response.data.segments
+		}
+	})
+}
+
+onMounted(() => {
+  loadSegment()
+});
 
 function goToSegmentDetails(segment) {
-	router.push({name: 'userSegmentsDetails'});
-	// router.push(`/segments/${segment.id}`)
+	router.push(`/userSegmentsDetails/${segment.id}`)
 }
 </script>
 

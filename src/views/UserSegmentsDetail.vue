@@ -4,7 +4,7 @@
 			<div class="card">
 				<div class="row w-full flex flex-wrap">
 					<div class="col-12">
-						<h1 class="m-0"> Schulwesen und Unwetter-Themen dominieren Interesse</h1>
+						<h1 class="m-0"> {{segment_detail.title}}</h1>
 					</div>
 
 					<!-- KPIs -->
@@ -14,19 +14,19 @@
 								<div class="col-2">
 									<div class="kpi-card">
 										<span>Unique users</span>
-										<h2 class="ml-5">160,187</h2>
+										<h2 class="ml-5">{{ formatNumber(segment_detail.unique_users) }}</h2>
 									</div>
 								</div>
 								<div class="col-3">
 									<div class="kpi-card">
 										<span>Unique Sessions</span>
-										<h2 class="ml-5">172,905</h2>
+										<h2 class="ml-5">{{ formatNumber(segment_detail.unique_sessions) }}</h2>
 									</div>
 								</div>
 								<div class="col-3">
 									<div class="kpi-card">
 										<span>Avg. Engaged Time</span>
-										<h2 class="ml-5">6.52 m</h2>
+										<h2 class="ml-5">{{ formatNumber(segment_detail.engage_time) }} m</h2>
 									</div>
 								</div>
 								<div class="col-2">
@@ -44,12 +44,7 @@
 					<!-- Text description -->
 					<div class="col-7">
 						<p class="subtitle">
-							Die Benutzer sind stark interessiert an Themen wie Westernstadt, Pullman City, Bränden,
-							Freizeitparks und Zerstörung. Sie möchten sich über lokale Ereignisse informieren,
-							insbesondere wenn sie negative Auswirkungen auf die Bevölkerung haben. Die Benutzer zeigen
-							auch ein großes Interesse an Themen wie Unfällen und Verkehrsunfällen, die in der Region
-							Passau passiert sind. Im Allgemeinen scheint dies eine lokale Bevölkerung zu sein, die sich
-							für regionale Ereignisse interessiert.
+							{{segment_detail.desc}}
 						</p>
 					</div>
 				</div>
@@ -57,20 +52,23 @@
 				<!-- Map -->
 				<div class="col-12">
 					<h3 class="mb-3"><i class="pi pi-map"></i> REGIONALER BLICK</h3>
+
 					<div class="row w-full flex flex-wrap">
+						
 						<div class="col-5">
 							<div ref="mapChart" class="map-box"></div>
 						</div>
+
 						<div class="col-7">
 							<h4>Interesse von Nutzern pro Regierungsbezirk</h4>
-							<ul>
-								<li>Das Interesse ist regional sehr unterschiedlich [...]</li>
-								<li>Oberfranken Benutzer interessiert sich stark [...]</li>
-								<li>Mittelfranken [...]</li>
-							</ul>
+
+							<!-- ✅ scroll wrapper -->
+							<div class="scrollable-text" v-html="marked(segment_detail.regions_desc)"></div>
 						</div>
+
 					</div>
 				</div>
+
 
 				<div class="col-12">
 					<h2 class="section-title">
@@ -165,53 +163,69 @@
 
 
 <script setup>
+import api from '@/boot/axios';
 import * as echarts from "echarts";
 import { onMounted, ref, watch } from "vue";
 import germanyJson from "@/assets/germany.json"; 
 import Dropdown from 'primevue/dropdown';
+import { useRoute } from 'vue-router';
+import { marked } from "marked";
 
 
-// Sample data 
-const target_segment = {
-  regions: {
-    "Oberbayern": 155,
-    "Niederbayern": 80,
-    "Oberfranken": 95,
-    "Unterfranken": 72,
-    "Schwaben": 110,
-    "Oberpfalz": 120,
-    "Mittelfranken": 100,
-  }
-};
+const route = useRoute();
+const segment_id = ref(null);
+const segment_detail = ref({
+	title: "",
+	desc: "",
+	unique_users: 0,
+	regions: {},
+	regions_desc: "",
+	freq_users: 0,
+	not_freq_users: 0,
+	engage_time: 0,
+	unique_sessions: 0,
+	engaged: 0,
+	not_engaged: 0,
+	week: 0,
+	weekend: 0,
+	day_consumption: {},
+	day_count: {},
+	mm_cat: {}
+});
 
-//  Filter GeoJSON to Bayern (NAME_1 == "Bayern")
-const bayernOnly = {
-  ...germanyJson,
-  features: germanyJson.features.filter(
-    (feature) => {
-			if (feature.properties.NAME_1 === "Bayern"){
-				feature.properties.name = feature.properties.NAME_2
-				return feature
-			}
-	}),
-};
-echarts.registerMap("germany_bayern", bayernOnly);
+function formatNumber(num) {
+  return num.toLocaleString("en-US");
+}
 
-// ✅ Extract data for map
-const data = bayernOnly.features.map((f) => ({
-  name: f.properties.NAME_2,          // e.g. "Oberbayern"
-  value: target_segment.regions[f.properties.NAME_2] || 0,
-}));
 
 const donut1 = ref(null);
 const donut2 = ref(null);
 const mapChart = ref(null);
 
 onMounted(() => {
-  initDonut(donut1.value, ["Engaged", "Not engaged"], [90.5, 9.5]);
-  initDonut(donut2.value, ["Frequent", "Non frequent"], [79.7, 20.3]);
-  initMap();
+	segment_id.value = route.params.id
+	loadSegmentDetails()
 });
+
+const loadSegmentDetails = async () => { 
+	api.get(`/UserSegment/${segment_id.value}`) 
+	.then((response) => {
+		if(response.status == 200) { 
+			console.log(response.data.segment_detail)
+			segment_detail.value = response.data.segment_detail
+			initDonuts();
+			initMap();
+			drawWeekdayWeekend();
+			drawTimeBuckets();
+			drawEventsByDay();
+		}
+	})
+}
+
+const initDonuts = () => { 
+  initDonut(donut1.value, ["Engaged", "Not engaged"], [segment_detail.value.engaged, segment_detail.value.not_engaged]);
+  initDonut(donut2.value, ["Frequent", "Non frequent"], [segment_detail.value.freq_users, segment_detail.value.not_freq_users]);
+}
 
 
 function initDonut(el, labels, values) {
@@ -242,6 +256,23 @@ function initDonut(el, labels, values) {
 }
 
 function initMap() {
+	//  Filter GeoJSON to Bayern (NAME_1 == "Bayern")
+	const bayernOnly = {
+		...germanyJson,
+		features: germanyJson.features.filter(
+			(feature) => {
+				if (feature.properties.NAME_1 === "Bayern"){
+					feature.properties.name = feature.properties.NAME_2
+					return feature
+				}
+		}),
+	};
+	echarts.registerMap("germany_bayern", bayernOnly);
+
+	const data = bayernOnly.features.map((f) => ({
+		name: f.properties.NAME_2,        
+		value: segment_detail.value.regions[f.properties.NAME_2] || 0,
+	}));
   const chart = echarts.init(mapChart.value);
 
   chart.setOption({
@@ -278,35 +309,12 @@ function initMap() {
 const weekdayWeekendRef = ref(null);
 const timeBucketsRef = ref(null);
 const eventsByDayRef = ref(null);
-
-// Fake data -------------------------------
-const weekdayWeekendData = {
-	labels: ["Weekday", "Weekend"],
-	values: [2400, 9600],
-};
-
-const eventsByDayData = {
-	labels: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-	values: [22000, 8000, 4000, 3000, 6000, 20000, 82000],
-};
-
-const timeBuckets = [
-	"00:00-01:59","02:00-03:59","04:00-05:59","06:00-07:59","08:00-09:59",
-	"10:00-11:59","12:00-13:59","14:00-15:59","16:00-17:59","18:00-19:59",
-	"20:00-21:59","22:00-23:59"
-];
-const timeBucketsData = [400, 600, 3200, 5000, 9000, 15500, 15000, 12000, 8000, 5000, 3000, 2000];
-
-// -----------------------------------------
-
-onMounted(() => {
-	drawWeekdayWeekend();
-	drawTimeBuckets();
-	drawEventsByDay();
-});
-
-
 function drawWeekdayWeekend() {
+	const weekdayWeekendData = {
+		labels: ["Weekday", "Weekend"],
+		values: [segment_detail.value.weekday, segment_detail.value.weekend],
+	};
+
 	const chart = echarts.init(weekdayWeekendRef.value);
 	chart.setOption({
 		xAxis: { type: "category", data: weekdayWeekendData.labels },
@@ -322,11 +330,11 @@ function drawWeekdayWeekend() {
 function drawTimeBuckets() {
 	const chart = echarts.init(timeBucketsRef.value);
 	chart.setOption({
-		xAxis: { type: "category", data: timeBuckets, boundaryGap: false },
+		xAxis: { type: "category", data: segment_detail.value.day_consumption.times, boundaryGap: false },
 		yAxis: { type: "value" },
 		series: [{
 			type: "line",
-			data: timeBucketsData,
+			data: segment_detail.value.day_consumption.values,
 			lineStyle: { width: 4, color: "#071847" }
 		}]
 	});
@@ -335,11 +343,11 @@ function drawTimeBuckets() {
 function drawEventsByDay() {
 	const chart = echarts.init(eventsByDayRef.value);
 	chart.setOption({
-		xAxis: { type: "category", data: eventsByDayData.labels },
+		xAxis: { type: "category", data:  segment_detail.value.day_count.day },
 		yAxis: { type: "value" },
 		series: [{
 			type: "bar",
-			data: eventsByDayData.values,
+			data: segment_detail.value.day_count.value,
 			itemStyle: { color: "#071847" }
 		}]
 	});
@@ -347,10 +355,10 @@ function drawEventsByDay() {
 
 
 // Dropdown values
-const entityOptions = ["Users", "Sessions"];
+const entityOptions = ["BR24 Categories", "Topics"];
 const topicOptions = ["Topics", "Categories"];
 
-const selectedEntity = ref("Users");
+const selectedEntity = ref("BR24 Categories");
 const selectedTopic = ref("Topics");
 
 // refs bound to <div ref="">
@@ -645,4 +653,21 @@ watch(selectedTopic, drawHeatmap);
 	margin-bottom: 1rem;
 	font-size: 0.95rem;
 }
+
+.scrollable-text {
+  max-height: 480px;     /* adjust this to match your map height */
+  overflow-y: auto;      /* enables vertical scrolling */
+  padding-right: 10px;   /* space from scrollbar */
+}
+
+/* Optional: nicer scrollbar (Webkit browsers / Chrome / Edge / Safari) */
+.scrollable-text::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollable-text::-webkit-scrollbar-thumb {
+  background: #b0b0b0;
+  border-radius: 10px;
+}
+
 </style>

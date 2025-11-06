@@ -13,7 +13,7 @@ const routes = [
     children: [
       { path: '/chats', name: 'chats', component: () => import('@/views/chats.vue'), meta: {requiresAuth: true} },
       { path: '/userSegments', name: 'userSegments', component: () => import('@/views/UserSegments.vue'), meta: {requiresAuth: true} },
-      { path: '/userSegmentsDetails', name: 'userSegmentsDetails', component: () => import('@/views/UserSegmentsDetail.vue'), meta: {requiresAuth: true} }
+      { path: '/userSegmentsDetails/:id', name: 'userSegmentsDetails', component: () => import('@/views/UserSegmentsDetail.vue'), meta: {requiresAuth: true} }
     ]
   }
 

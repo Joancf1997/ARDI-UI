@@ -41,6 +41,10 @@ function handleNewMessage(msg) {
 </script>
 
 <style scoped>
+:deep(.layout) {
+  height: 92% !important;
+}
+
 /* Floating bubble */
 .assistant-bubble {
   position: fixed;

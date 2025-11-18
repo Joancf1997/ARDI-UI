@@ -1,5 +1,38 @@
 ﻿<template>
   <div class="layout">
+    <!-- Rename Dialog -->
+    <Dialog 
+      v-model:visible="showRenameDialog"
+      header="Change name"
+      modal
+      :style="{ width: '400px' }"
+    >
+      <div class="p-fluid">
+        <label class="field-label">New name</label>
+        <InputText v-model="renameText" autofocus />
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text @click="showRenameDialog = false" />
+        <Button label="Guardar" @click="confirmRename" />
+      </template>
+    </Dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <Dialog 
+      v-model:visible="showDeleteDialog"
+      header="Delete Chat"
+      modal
+      :style="{ width: '380px' }"
+    >
+      <p>Sure you want to delete the chat?</p>
+
+      <template #footer>
+        <Button label="Cancelar" text @click="showDeleteDialog = false" />
+        <Button label="Eliminar" severity="danger" @click="confirmDelete" />
+      </template>
+    </Dialog>
+
 
     <!-- LEFT THREADS SIDEBAR -->
     <aside 
@@ -16,9 +49,38 @@
           v-for="t in threads" 
           :key="t.id"
           :class="['thread-item', { active: t.id === currentThreadId }]"
-          @click="selectThread(t.id)"
         >
-          <span>{{ t.name || ('Thread ' + t.id.slice(0,5)) }}</span>
+          <!-- Thread name -->
+          <span class="thread-name" @click="selectThread(t.id)">
+            {{ t.name || ('Thread ' + t.id.slice(0,5)) }}
+          </span>
+
+          <!-- Three dots -->
+          <i 
+            class="pi pi-ellipsis-h thread-menu-trigger"
+            @click.stop="toggleMenu(t.id)"
+          ></i>
+
+          <!-- Popover menu -->
+          <div 
+            v-if="openMenuId === t.id" 
+            class="thread-menu"
+            @click.stop
+          >
+            <div class="menu-item" @click="promptRename(t)">
+              <i class="pi pi-pencil"></i>
+              Change name
+            </div>
+
+
+            <div class="menu-separator"></div>
+
+            <div class="menu-item delete" @click="promptDelete(t.id)">
+              <i class="pi pi-trash"></i>
+              Delete
+            </div>
+
+          </div>
         </div>
       </div>
     </aside>
@@ -120,17 +182,25 @@ import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
 import TabView from "primevue/tabview";
 import TabPanel from "primevue/tabpanel";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 
+const showRenameDialog = ref(false);
+const showDeleteDialog = ref(false);
+const renameText = ref("");
+const threadToRename = ref(null);
+const threadToDelete = ref(null);
 
 /* SIDEBAR TOGGLE */
-const showSidebar = ref(true);
+const showSidebar = ref(false);
 
 
 /* THREADS STATE */
 const threads = ref([]);  
 const currentThreadId = ref(null);
 
-const userId = "11111111-1111-1111-1111-111111111111"; 
+var userauth = JSON.parse(window.localStorage.getItem('ardiUserData'));
+const userId = userauth.user_id
 
 /* CHAT STATE */
 const messages = ref([]);
@@ -149,6 +219,71 @@ onMounted(async () => {
   scrollToBottom();
 });
 
+const openMenuId = ref(null);
+function promptRename(thread) {
+  threadToRename.value = thread;
+  renameText.value = thread.name;
+  showRenameDialog.value = true;
+  openMenuId.value = null;
+}
+
+function promptDelete(threadId) {
+  threadToDelete.value = threadId;
+  showDeleteDialog.value = true;
+  openMenuId.value = null;
+}
+
+
+function toggleMenu(id) {
+  openMenuId.value = openMenuId.value === id ? null : id;
+}
+
+function closeMenus() {
+  openMenuId.value = null;
+}
+
+// Close popup when clicking outside
+document.addEventListener("click", () => closeMenus());
+
+async function confirmRename() {
+  if (!renameText.value.trim()) return;
+  renameThread(threadToRename.value.id, renameText.value.trim())
+  showRenameDialog.value = false;
+}
+
+
+async function confirmDelete() {
+  try {
+    await api.delete(`/chat/thread/${threadToDelete.value}`, {
+      data: {
+        user_id: userId
+      }
+    });
+
+    // Remove from UI
+    threads.value = threads.value.filter(t => t.id !== threadToDelete.value);
+
+    // If the deleted thread is currently open  
+    if (currentThreadId.value === threadToDelete.value) {
+      currentThreadId.value = null;
+      messages.value = [];
+      localStorage.removeItem("current_thread_id");
+
+      // Automatically select first thread if available
+      if (threads.value.length > 0) {
+        const newId = threads.value[0].id;
+        currentThreadId.value = newId;
+        localStorage.setItem("current_thread_id", newId);
+        selectThread(newId);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to delete thread:", err);
+  }
+
+  showDeleteDialog.value = false;
+}
+
 
 /* LOAD THREADS form user */
 async function loadThreads() {
@@ -157,13 +292,19 @@ async function loadThreads() {
   });
   threads.value = res.data ?? [];
   if (threads.value.length > 0) {
-    selectThread(threads.value[0].id);
+    const stored = JSON.parse(localStorage.getItem("ardiUserData"));
+    const lastThread = stored?.thread;
+    selectThread(lastThread);
   }
 }
 
 /* LOAD MESSAGES FOR A THREAD */
 async function selectThread(id) {
   currentThreadId.value = id;
+  const stored = localStorage.getItem("ardiUserData");
+  let data = stored ? JSON.parse(stored) : {};
+  data.thread = id;
+  localStorage.setItem("ardiUserData", JSON.stringify(data));
 
   const res = await api.get(`/chat/history/${id}`, {
     params: { user_id: userId }
@@ -187,19 +328,7 @@ async function renameThread(threadId, newName) {
     name: newName,
     user_id: userId
   });
-
-  const updated = res.data.thread;
-
-  // Update local thread list
-  const idx = threads.value.findIndex(t => t.id === threadId);
-  if (idx !== -1) {
-    threads.value[idx].name = updated.name;
-  }
-
-  // If currently selected, update UI
-  if (currentThreadId.value === threadId) {
-    currentThreadName.value = updated.name;
-  }
+  loadThreads();
 }
 
 /* CREATE A NEW THREAD */
@@ -278,7 +407,6 @@ const send = async () => {
       const idx = messages.value.findIndex(m => m.id === typingId);
 
       if (response.status === 200) {
-        console.log(response.data.response)
         messages.value.splice(idx, 1, {
           id: cryptoRandomId(),
           role: "assistant",
@@ -327,7 +455,8 @@ const viewOutputs = (outputs) => {
 }
 
 .sidebar {
-  width: 260px;
+  width: 300px;
+  padding: 20px;
   border-right: 1px solid #ddd;
   background: #fafafa;
   display: flex;
@@ -537,4 +666,92 @@ const viewOutputs = (outputs) => {
   background: white;
   cursor: pointer;
 }
+
+.thread-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.thread-item:hover {
+  background: #dae1f774;
+}
+
+.thread-item.active {
+  background: #071847;
+}
+
+.thread-menu-trigger {
+  opacity: 0;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+}
+
+.thread-item:hover .thread-menu-trigger {
+  opacity: 1;
+}
+
+.thread-menu-trigger:hover {
+  background: #444;
+}
+
+.thread-menu {
+  position: absolute;
+  right: 8px;
+  top: 36px;
+  width: 180px;
+  background: #2c3756;
+  border: 1px solid #071847;
+  border-radius: 12px;
+  padding: 6px 0;
+  z-index: 9999;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+}
+
+.menu-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #eee;
+}
+
+.menu-item i {
+  font-size: 0.9rem;
+}
+
+.menu-item:hover {
+  background: #071847;
+}
+
+.menu-separator {
+  height: 1px;
+  background: #333;
+  margin: 6px 0;
+}
+
+.menu-item.delete {
+  color: #ff6b6b;
+}
+
+.menu-item.delete:hover {
+  background: #071847;
+}
+
+.field-label {
+  margin-bottom: 6px;
+  display: block;
+  font-size: 14px;
+  color: #ccc;
+}
+
+
 </style>

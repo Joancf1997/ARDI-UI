@@ -42,7 +42,7 @@ const onTopBarMenuButton = () => {
     topbarMenuActive.value = !topbarMenuActive.value;
 };
 const onLogOut = () => {			
-    window.localStorage.removeItem('mesI4Mon');
+    window.localStorage.removeItem('ardiUserData');
 		router.push({name: 'login'});
 };
 

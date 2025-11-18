@@ -27,6 +27,11 @@ const model = ref([
                 icon: "pi pi-users",
                 label: "User Segments",
                 to: "/userSegments"
+            },
+            {
+                icon: "pi pi-user",
+                label: "Users",
+                to: "/users"
             }
         ]
     }

@@ -48,10 +48,30 @@ const messageSeverity = ref('');
 const credenciales = ref({
     username: '',
     password: ''    
-
 });
-const ingresar = () =>{
+
+async function ingresar() {
+    try {
+    let payload = { 
+        username: credenciales.value.username, 
+        password: credenciales.value.password
+    }
+    const res = await api.post("/auth/login", payload);
+    const login = res.data.login;
+    localStorage.setItem("ardiUserData", JSON.stringify({
+      user_id: login.user_id,
+      username: login.username,
+      token: login.token,
+      expires_at: login.expires_at
+    }));
     router.push({name: 'chats'});
+  } catch (err) {
+    console.error("Login error:", err);
+    if (err.response?.data?.detail) {
+      throw new Error(err.response.data.detail);
+    }
+    throw new Error("Login failed.");
+  }
 }
 
 

@@ -12,6 +12,7 @@ const routes = [
     name: 'Home',
     children: [
       { path: '/chats', name: 'chats', component: () => import('@/views/chats.vue'), meta: {requiresAuth: true} },
+      { path: '/users', name: 'users', component: () => import('@/views/users.vue'), meta: {requiresAuth: true} },
       { path: '/userSegments', name: 'userSegments', component: () => import('@/views/UserSegments.vue'), meta: {requiresAuth: true} },
       { path: '/userSegmentsDetails/:id', name: 'userSegmentsDetails', component: () => import('@/views/UserSegmentsDetail.vue'), meta: {requiresAuth: true} }
     ]
@@ -36,22 +37,22 @@ function parseJwt (token) {
 
 
 // Guard the routes 
-// router.beforeEach((to, _) => {
+router.beforeEach((to, _) => {
 
-//   var userauth = JSON.parse(window.localStorage.getItem('I4MON'));
-//   // Validar token existente
-//   if (userauth) {
-//     const jwtPayload = parseJwt(userauth.usuario.token);
-//     if (jwtPayload.exp < Date.now()/1000) {
-//       window.localStorage.removeItem('I4MON')
-//       router.push({name: 'login'});
-//     }
-//   } else {
-//     if(to.name != "login"){ 
-//       router.push({name: 'login'});
-//       return;
-//     }
-//   }
-// })
+  var userauth = JSON.parse(window.localStorage.getItem('ardiUserData'));
+  // Validar token existente
+  if (userauth) {
+    const jwtPayload = parseJwt(userauth.token);
+    if (jwtPayload.exp < Date.now()/1000) {
+      window.localStorage.removeItem('ardiUserData')
+      router.push({name: 'login'});
+    }
+  } else {
+    if(to.name != "login"){ 
+      router.push({name: 'login'});
+      return;
+    }
+  }
+})
 
 export default router

@@ -103,7 +103,6 @@ const loadUsers = () => {
     .then((response) => {
 		if(response.status == 200) { 
 			users.value = response.data.users
-			console.log(users.value)
 		}
     })
     .catch((_) => {

@@ -19,8 +19,8 @@ export function installAxiosInterceptors() {
     api.interceptors.request.use(
         (config) => {
             // loading.setLoading(true);
-            var userauth = JSON.parse(window.localStorage.getItem('ARDI'));
-            var token = userauth ? userauth.usuario.token : null;
+            var userauth = JSON.parse(window.localStorage.getItem('ardiUserData'));
+            var token = userauth ? userauth.token : null;
             config.headers.Authorization = token
             return config;
         },

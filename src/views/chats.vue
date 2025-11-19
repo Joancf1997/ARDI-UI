@@ -267,20 +267,23 @@ async function confirmDelete() {
     if (currentThreadId.value === threadToDelete.value) {
       currentThreadId.value = null;
       messages.value = [];
-      localStorage.removeItem("current_thread_id");
+      const data = JSON.parse(localStorage.getItem("ardiUserData")) || {};
+      data.current_thread_id = null;
+      localStorage.setItem("ardiUserData", JSON.stringify(data));
 
       // Automatically select first thread if available
       if (threads.value.length > 0) {
         const newId = threads.value[0].id;
         currentThreadId.value = newId;
-        localStorage.setItem("current_thread_id", newId);
+        const data = JSON.parse(localStorage.getItem("ardiUserData")) || {};
+        data.current_thread_id = newId;
+        localStorage.setItem("ardiUserData", JSON.stringify(data));
         selectThread(newId);
       }
     }
   } catch (err) {
     console.error("Failed to delete thread:", err);
   }
-
   showDeleteDialog.value = false;
 }
 
@@ -292,9 +295,14 @@ async function loadThreads() {
   });
   threads.value = res.data ?? [];
   if (threads.value.length > 0) {
-    const stored = JSON.parse(localStorage.getItem("ardiUserData"));
-    const lastThread = stored?.thread;
-    selectThread(lastThread);
+    const stored = localStorage.getItem("ardiUserData");
+    let data = stored ? JSON.parse(stored) : {};
+    data.thread = threads.value[0].id;
+    let lastThread = data.thread 
+    localStorage.setItem("ardiUserData", JSON.stringify(data));
+    if (lastThread) {
+      selectThread(lastThread);
+    }
   }
 }
 

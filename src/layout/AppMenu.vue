@@ -32,6 +32,11 @@ const model = ref([
                 icon: "pi pi-user",
                 label: "Users",
                 to: "/users"
+            },
+            {
+                icon: "pi pi-chart-bar",
+                label: "Dataset Evaluation",
+                to: "/datasetEvaluation"
             }
         ]
     }

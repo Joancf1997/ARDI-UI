@@ -211,7 +211,6 @@ const loadSegmentDetails = async () => {
 	api.get(`/UserSegment/${segment_id.value}`) 
 	.then((response) => {
 		if(response.status == 200) { 
-			console.log(response.data.segment_detail)
 			segment_detail.value = response.data.segment_detail
 			initDonuts();
 			initMap();

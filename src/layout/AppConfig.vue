@@ -174,11 +174,6 @@ defineProps({
     }
 });
 
-onMounted(() => {
-    getOrganizationConfiguration()
-})
-
-
 const toast = useToast();
 const $primevue = usePrimeVue();
 
@@ -191,19 +186,6 @@ const menuModes = ref([
 const compactMaterial = ref(false);
 
 const { setScale, layoutConfig } = useLayout();
-
-
-// save styling and user image 
-const getOrganizationConfiguration = () => { 
-	let userauth = JSON.parse(window.localStorage.getItem('mesI4Sol'));
-
-    api.post('getOrganizationStyle', {id: userauth.usuario.org_id}) 
-	.then((response) => {
-        if(response.status == 200) { 
-            // console.log(response.data.style)
-	    }
-	})
-}
 
 const saveStyle = () => { 
 	let userauth = JSON.parse(window.localStorage.getItem('mesI4Sol'));

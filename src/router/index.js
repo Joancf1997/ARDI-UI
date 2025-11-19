@@ -13,7 +13,8 @@ const routes = [
     children: [
       { path: '/chats', name: 'chats', component: () => import('@/views/chats.vue'), meta: {requiresAuth: true} },
       { path: '/users', name: 'users', component: () => import('@/views/users.vue'), meta: {requiresAuth: true} },
-      { path: '/userSegments', name: 'userSegments', component: () => import('@/views/UserSegments.vue'), meta: {requiresAuth: true} },
+      { path: '/userSegments', name: 'userSegments', component: () => import('@/views/UserSegments.vue'), meta: { requiresAuth: true } },
+      { path: '/datasetEvaluation', name: 'datasetEvaluation', component: () => import('@/views/DatasetEvaluation.vue'), meta: { requiresAuth: true } },
       { path: '/userSegmentsDetails/:id', name: 'userSegmentsDetails', component: () => import('@/views/UserSegmentsDetail.vue'), meta: {requiresAuth: true} }
     ]
   }

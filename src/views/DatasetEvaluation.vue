@@ -22,15 +22,41 @@
 												<button icon="pi pi-plus" class="mr-2" severity="success" @click="newDatasetEvaluation()"> New Dataset Evaluation </button>
 											</div>
 									</template>
+									<template v-slot:end>
+										<div class="my-2">
+											<InputText
+												v-model="filters.thread_name.value"
+												placeholder="Filter by thread name (ex: Segment 1, ARDI...)"
+												class="w-full"
+											/>										
+										</div>
+									</template>
+
+
 							</Toolbar>
 							<DataTable
 								:value="evaluations"
+								v-model:filters="filters"
+								v-model:expandedRows="expandedRows"
 								paginator
 								:rows="10"
 								showGridlines
-								rowExpansion
 								dataKey="id"
+								filterDisplay="row"
+								@filter="onFilter"
 							>
+								<!-- 🔽 Expander column (THIS WAS MISSING) -->
+								<Column expander style="width: 3rem" />
+
+								<Column
+									field="thread_name"
+									header="Thread"
+									filter
+									filterPlaceholder="Search thread..."
+									style="width: 16rem"
+								/>
+
+
 								<!-- Question -->
 								<Column field="question" header="Question" style="width: 35%" />
 
@@ -59,18 +85,18 @@
 									</template>
 								</Column>
 
-
+								<!-- Match Ratio -->
 								<Column field="match_ratio" header="Matched">
 									<template #body="{ data }">
 										<Tag 
-											:value="data.match_ratio.toFixed(2)" 
+											:value="(data.match_ratio * 100).toFixed(0) + '%'" 
 											:severity="getSeverity(data.match_ratio)"
 										/>
 									</template>
 								</Column>
 
-								<!-- Match Ratio -->
-								<Column field="match_ratio_str" header="Matched Frction">
+								<!-- Match Fraction -->
+								<Column field="match_ratio_str" header="Matched Fraction">
 									<template #body="{ data }">
 										<Tag :value="data.match_ratio_str" severity="info" />
 									</template>
@@ -83,16 +109,17 @@
 									</template>
 								</Column>
 
-								<!-- Expanded Row -->
+								<!-- ✅ EXPANDED CONTENT -->
 								<template #expansion="{ data }">
-									<div class="p-4 bg-gray-50 rounded">
+									<div class="p-4 surface-100 border-round">
+
 										<h3 class="font-semibold mb-2">Details</h3>
 
 										<p><strong>Question:</strong> {{ data.question }}</p>
 
-										<div class="mt-2">
+										<div class="mt-3">
 											<strong>Expected Tools:</strong>
-											<div class="mt-1">
+											<div class="mt-2">
 												<Chip 
 													v-for="t in data.labels" 
 													:key="'lbl-'+t" 
@@ -102,29 +129,34 @@
 											</div>
 										</div>
 
-										<div class="mt-2">
+										<div class="mt-3">
 											<strong>Actual Tools:</strong>
-											<div class="mt-1">
+											<div class="mt-2">
 												<Chip 
 													v-for="t in data.actual_tools" 
 													:key="'act-'+t" 
 													:label="t"
-													severity="success"
 													class="mr-1 mb-1"
+													severity="success"
 												/>
 											</div>
 										</div>
 
-										<p class="mt-3">
-											<strong>Match Fraction:</strong>
+										<div class="mt-3">
+											<strong>Match:</strong>
 											<Tag :value="data.match_ratio_str" severity="info" />
-										</p>
+										</div>
 
-										<p class="mt-2"><strong>ID:</strong> {{ data.id }}</p>
-										<p class="mt-1"><strong>Thread:</strong> {{ data.thread_id }}</p>
+										<div class="mt-3 text-sm text-gray-500">
+											<p><strong>ID:</strong> {{ data.id }}</p>
+											<p><strong>Thread ID:</strong> {{ data.thread_id }}</p>
+											<p><strong>Thread Name:</strong> {{ data.thread_name }}</p>
+										</div>
 									</div>
 								</template>
+
 							</DataTable>
+
 
 					</div>
 			</div>
@@ -139,6 +171,43 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Tag from "primevue/tag";
 import Chip from "primevue/chip";
+import InputText from 'primevue/inputtext';
+import { FilterMatchMode } from 'primevue/api'
+
+const onFilter = (event) => {
+  // event.filteredValue = rows that passed the filter
+  const list = event.filteredValue || [];
+
+  if (list.length === 0) {
+    metrics.value = {
+      totalRequests: 0,
+      overallMatchRatio: 0,
+      avgToolsPerRequest: 0
+    };
+    return;
+  }
+
+  const totalRequests = list.length;
+
+  const totalMatched = list.reduce((sum, r) => sum + r.matched, 0);
+  const totalLabels = list.reduce((sum, r) => sum + r.total_labels, 0);
+  const totalTools = list.reduce((sum, r) => sum + (r.actual_tools?.length || 0), 0);
+
+  metrics.value.totalRequests = totalRequests;
+  metrics.value.overallMatchRatio = totalLabels > 0 
+    ? +(totalMatched / totalLabels).toFixed(2) 
+    : 0;
+
+  metrics.value.avgToolsPerRequest = +(
+    totalTools / totalRequests
+  ).toFixed(2);
+};
+
+
+const filters = ref({
+  thread_name: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
+
 
 const evaluations = ref([])
 const metrics = ref({
@@ -146,6 +215,8 @@ const metrics = ref({
   overallMatchRatio: 0,
   avgToolsPerRequest: 0,
 });
+
+const expandedRows = ref([]);
 
 // Overall metrics computed from the evaluations table
 const overallStats = () => {
